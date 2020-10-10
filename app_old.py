@@ -196,8 +196,6 @@ def main():
         #         os.remove('file_tmp.mp4')
         #     except:
         #         pass
-        global r
-        r = None
         opts = ["System upload","Blob Storage"]
         selection = st.radio(label = "select file", options =opts )
         if selection == opts[0]:
@@ -215,20 +213,6 @@ def main():
                         f.write(file.read())
             if st.button(label="Upload BLOB"):
                 push_blob_f(video_id='file_tmp', container='var', basepath='.')
-                if st.button(label = "Start OD"):
-                    r = requests.post("http://52.226.46.64:5000",
-                        json={'ID': 'file_tmp', 'FPS': '1', 'duration': '5', 'lang': '',
-                                'container': 'var'})
-
-        if selection == opts[1]:
-            video_id = st.text_input("pitch ID BLOB")
-        if st.button(label = "start OD"):
-            r = requests.post("http://52.226.46.64:5000",
-                json={'ID': f'{video_id}', 'FPS': '1', 'duration': '5', 'lang': 'hindi',
-                        'container': 'athenaliveprod'})
-            # st.text(r.text)
-
-    
 
 
 ########################################################################################
@@ -239,6 +223,9 @@ def main():
 
 
         if st.button("Make Prediction"):
+            r = requests.post("http://52.226.46.64:5000",
+                            json={'ID': 'file_tmp', 'FPS': '1', 'duration': '5', 'lang': '',
+                                    'container': 'var'})
             
             od_df = odasdf(literal_eval(r.text))
             max_area_percentage, most_occured_label_number, number_of_label_first_3_frame,most_occured_label_first_3_frame_number = od_feature(od_df)
