@@ -224,7 +224,7 @@ def main():
 
         if st.button("Make Prediction"):
             r = requests.post("http://52.226.46.64:5000",
-                            json={'ID': 'file_tmp', 'FPS': '1', 'duration': '5', 'lang': '',
+                            json={'ID': 'file_tmp', 'FPS': '1', 'duration': '60', 'lang': '',
                                     'container': 'var'})
             
             od_df = odasdf(literal_eval(r.text))
