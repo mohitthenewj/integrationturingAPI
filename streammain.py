@@ -105,9 +105,11 @@ def od_feature(od_df = None):
         None)
 
 def make_prediction(video_id = None, lang = '', container = 'var', published_date = None, primary = None, d_primary = None):
-    r = requests.post("http://52.226.46.64:5000",
-                json={'ID': video_id , 'FPS': '1', 'duration': '60', 'lang': lang,
-                        'container': container})
+    with st.spinner("Started OD"):
+        r = requests.post("http://52.226.46.64:5000",
+                    json={'ID': video_id , 'FPS': '1', 'duration': '5', 'lang': lang,
+                            'container': container})
+    st.info("OD completed")
     
     od_df = odasdf(literal_eval(r.text))
     max_area_percentage, most_occured_label_number, number_of_label_first_3_frame,most_occured_label_first_3_frame_number = od_feature(od_df)
@@ -115,45 +117,47 @@ def make_prediction(video_id = None, lang = '', container = 'var', published_dat
     # Take user input GOLDEN DATA
 
     # Any production date after today will be consider as today only
-    def correct_date(date_):
-        if date_ > (datetime.now()).date():
-            return (datetime.now()).date()
-        elif date_ < date(2019, 3, 18):
-            return date(2019, 3, 18)
-        else:
-            return date_
 
-    published_date = correct_date(published_date)
-    #st.write(published_date)
+    with st.spinner("Fetching FB data"):
+        def correct_date(date_):
+            if date_ > (datetime.now()).date():
+                return (datetime.now()).date()
+            elif date_ < date(2019, 3, 18):
+                return date(2019, 3, 18)
+            else:
+                return date_
 
-    last_day_features = ['last_day_page_fan_adds_by_paid_non_paid_unique_paid',
-                        'last_day_page_impressions_unique',
-                        'last_day_page_posts_impressions_nonviral',
-                        'last_day_page_posts_impressions_nonviral_unique',
-                        'last_day_page_actions_post_reactions_like_total',
-                        'last_day_page_actions_post_reactions_wow_total',
-                        'last_day_page_actions_post_reactions_anger_total',
-                        'last_day_page_fan_removes_unique',
-                        'last_day_page_video_repeat_views',
-                        'last_day_page_video_complete_views_30s_autoplayed']
+        published_date = correct_date(published_date)
+        #st.write(published_date)
 
-    last_day_features_values = []
-    last_seven_day_features_values = []
+        last_day_features = ['last_day_page_fan_adds_by_paid_non_paid_unique_paid',
+                            'last_day_page_impressions_unique',
+                            'last_day_page_posts_impressions_nonviral',
+                            'last_day_page_posts_impressions_nonviral_unique',
+                            'last_day_page_actions_post_reactions_like_total',
+                            'last_day_page_actions_post_reactions_wow_total',
+                            'last_day_page_actions_post_reactions_anger_total',
+                            'last_day_page_fan_removes_unique',
+                            'last_day_page_video_repeat_views',
+                            'last_day_page_video_complete_views_30s_autoplayed']
 
-    # read the page data from database
-    page_sql = 'SELECT * FROM fb.pageinsightsdaily where pageName = "NEWJPLUS"'
-    ld_df = pd.read_sql(page_sql, cnx)
+        last_day_features_values = []
+        last_seven_day_features_values = []
 
-    # last day features extraction
-    for feature in last_day_features:
-        last_day_features_values.append(
-            (ld_df[ld_df['consolidated_end_time'] == published_date - timedelta(days=1)][feature[9:]]).reset_index(
-                drop=True)[0])
-        cursor.close()
+        # read the page data from database
+        page_sql = 'SELECT * FROM fb.pageinsightsdaily where pageName = "NEWJPLUS"'
+        ld_df = pd.read_sql(page_sql, cnx)
 
-    # GET VALUES FOR EACH INPUT
-    k_primary = get_value(primary, d_primary)
+        # last day features extraction
+        for feature in last_day_features:
+            last_day_features_values.append(
+                (ld_df[ld_df['consolidated_end_time'] == published_date - timedelta(days=1)][feature[9:]]).reset_index(
+                    drop=True)[0])
+            cursor.close()
 
+        # GET VALUES FOR EACH INPUT
+        k_primary = get_value(primary, d_primary)
+    st.info("Completed data fetch")
     # RESULT OF USER INPUT
 
     vectorized_result = [max_area_percentage,
@@ -161,12 +165,12 @@ def make_prediction(video_id = None, lang = '', container = 'var', published_dat
                         most_occured_label_first_3_frame_number, k_primary] + last_day_features_values
     
     sample_data = np.array(vectorized_result).reshape(1, -1)
-
-    model_predictor = load_model_n_predict("models/classification_ada_15_newjplus.pkl")
-    prediction = model_predictor.predict(sample_data)
+    with st.spinner("Turing started"):
+        model_predictor = load_model_n_predict("models/classification_ada_15_newjplus.pkl")
+        prediction = model_predictor.predict(sample_data)
     # st.text(prediction)
     #final_result = get_key(prediction, prediction_label)
-    st.success("Predicted video category is --> {}".format(prediction[0].upper()))
+    st.success("Predicted video category is  --> {}".format(prediction[0].upper()))
     st.write('Low: 0-12800')
     st.write('Average: 12801-39000')
     st.write('High: Any number of views above 39000')
@@ -296,21 +300,26 @@ def main():
         
         if selection == opts[1]:
             video_id  = st.text_input(label="Video ID")
+            lang = 'hindi'
+            container = 'athenaliveprod'
 
-            with open(f'{basepath}/{video_id}.mp4','rb') as f:
-                vid = f.read()
+            try:
+                pull_main(video_id = video_id, container_client = container, lang = lang)
+                with open(f'{basepath}/{video_id}.mp4','rb') as f:
+                    vid = f.read()
+                st.video(vid)
 
-            st.video(vid)
+            except:
+                st.info(f"{video_id} not found in Blob Storage")
+                pass
 
+            
             primary = st.selectbox('Primary Category', tuple(d_primary.keys()))
             # Retreive data from FB API
             published_date = st.date_input('Video Publishing Date')
 
             
-            lang = 'hindi'
-            container = 'athenaliveprod'
 
-            pull_main(video_id = video_id, container_client = container, lang = lang)
             
 
         if st.button("Make Prediction"):
